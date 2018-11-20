@@ -1,0 +1,185 @@
+Sub SortForCSV()
+    Dim CWS As Worksheet
+    Dim region As Range
+    Dim Cell As Range
+    Dim ErrorText As String
+    Dim aStreetNo() As Variant
+    Dim iMaxRows As Integer
+    Dim iRow As Integer
+    Dim oddValue
+    
+    Set CWS = ActiveSheet
+    Set region = Range("A1").CurrentRegion
+    
+    iMaxRows = region.Rows.Count()
+    iMaxCol = region.Columns.Count()
+    
+    For iCol = 1 To iMaxCol
+        region.Cells(1, iCol).Value = Trim(region.Cells(1, iCol).Value)
+    Next
+    
+    'On Error GoTo ErrHandler
+    
+    ErrorText = "Could not find the StreetNo Column"
+    '=================================
+    Set region = CWS.Rows(1)
+    Set region = region.Find("StreetNo")
+    
+    Set region = region.Next
+    
+    ErrorText = "Give new row a name"
+    region.EntireColumn.Insert
+    Set region = region.Previous
+    region.Rows(1) = "ISODD"
+    
+    ErrorText = "Odds and Evens"
+    '=================================
+    Set region = CWS.Rows(1)
+    Set region = region.Find("StreetNo")
+    Set region = region.Resize(region.Rows.Count, region.Columns.Count + 1)
+
+    For iRow = 2 To iMaxRows
+        oddValue = region.Cells(iRow, 1)
+        If oddValue = "" Then
+            oddValue = 1
+        Else
+            oddValue = (oddValue Mod 2)
+        End If
+    
+        region.Cells(iRow, 2) = oddValue
+    Next
+        
+    
+    ErrorText = "Remove 'The' from envelope Name"
+    '=================================
+    
+    Set region = CWS.Rows(1)
+    Set region = region.Find("EnvName")
+    
+    Set region = region.Next
+    region.EntireColumn.Insert
+    Set region = region.Previous
+    region.Rows(1) = "Salutation"
+    
+    Set region = CWS.Rows(1)
+    Set region = region.Find("EnvName")
+    Set region = region.Resize(region.Rows.Count, region.Columns.Count + 1)
+    
+    For iRow = 2 To iMaxRows
+        sFixedName = region.Cells(iRow, 1)
+        
+        If (LCase(Left(sFixedName, 4))) = "the " Then
+            sFixedName = (Mid(sFixedName, 5))
+        End If
+        region.Cells(iRow, 2) = sFixedName
+    Next
+    
+    ErrorText = "Sort by Ward, Walk, Street, ISODD and then StreetNo"
+    '=================================
+    'Ward, Walk, Street, ISODD and then StreetNo.
+    
+    Set region = Range("A1").CurrentRegion
+    With CWS.Sort
+        .SortFields.Clear
+        .SortFields.Add Key:=FindKey("Ward"), Order:=xlAscending
+        .SortFields.Add Key:=FindKey("Walk"), Order:=xlAscending
+        .SortFields.Add Key:=FindKey("Street"), Order:=xlAscending
+        .SortFields.Add Key:=FindKey("ISODD"), Order:=xlAscending
+        .SortFields.Add Key:=FindKey("StreetNo"), Order:=xlAscending
+        .SetRange region
+        .Header = xlYes
+        .Apply
+    End With
+    
+    ErrorText = "Add Sequence Number"
+    '=================================
+    
+    Set region = Range("A1").EntireColumn
+    region.Insert
+    
+    Set region = Range("A1").EntireColumn
+    region.Cells(1, 1) = "Seq"
+    
+    For iRow = 2 To iMaxRows
+        sFixedName = region.Cells(iRow, 1)
+        region.Cells(iRow, 1) = (iRow - 1)
+    Next
+    
+    ErrorText = "Delete Unneeded columns"
+    '=================================
+    
+    RemoveColumn ("PollingDistrictCode")
+    RemoveColumn ("ElectorNumberWithSuffix")
+    RemoveColumn ("WalkManagerOrder")
+    RemoveColumn ("Building")
+    RemoveColumn ("StreetNo")
+    RemoveColumn ("ISODD")
+    RemoveColumn ("Street")
+    RemoveColumn ("AptNo")
+    RemoveColumn ("Phone")
+    RemoveColumn ("SubRoad")
+    RemoveColumn ("Locality")
+    RemoveColumn ("Westminster")
+    RemoveColumn ("County")
+    RemoveColumn ("CountyDivision")
+    RemoveColumn ("DevolvedRegion")
+    RemoveColumn ("DevolvedConstituency")
+    
+    ErrorText = "Save file with correct ending"
+    '=================================
+    MsgBox saveFileForMerge()
+    
+    ErrorText = "Close the file"
+    '=================================
+    ActiveWorkbook.Close
+    
+    Exit Sub
+
+ErrHandler:
+        MsgBox ErrorText
+
+End Sub
+
+
+
+
+Function FindKey(sKeyName)
+    Dim region As Range
+    
+    Set CWS = ActiveSheet
+    Set region = CWS.Rows(1)
+    Set region = region.Find(What:=sKeyName, LookIn:=xlValues, LookAt:=xlWhole)
+    
+    Set FindKey = region
+End Function
+
+Sub RemoveColumn(sKeyName)
+    Dim rg As Range
+    
+    Set rg = FindKey(sKeyName)
+    If rg Is Nothing Then
+        Exit Sub
+    End If
+    
+    Set rg = rg.EntireColumn
+    rg.Delete
+    
+End Sub
+
+Function saveFileForMerge()
+    Dim WB As Workbook
+    
+    Set WB = ActiveWorkbook
+    sFilename = WB.FullName
+    iPos = InStrRev(sFilename, ".")
+    
+    If (iPos <> 0) Then
+        sFilename = Left(sFilename, iPos)
+    End If
+    
+    sFilename = sFilename + "csv"
+    
+    WB.SaveAs Filename:=sFilename, FileFormat:=xlCSV
+    
+    saveFileForMerge = sFilename
+End Function
